@@ -40,11 +40,12 @@ def create_app(config=None, instance_config=None):
 
 
 def register_blueprints(app):
-    from flasquelistan.views import (auth, admin, quotes, serviceworker,
+    from flasquelistan.views import (auth, admin, api, quotes, serviceworker,
                                      strequelistan)
     from flasquelistan import scripts
     app.register_blueprint(auth.mod)
     app.register_blueprint(admin.mod)
+    app.register_blueprint(api.mod)
     app.register_blueprint(serviceworker.mod)
     app.register_blueprint(strequelistan.mod)
     app.register_blueprint(quotes.mod)
@@ -306,7 +307,16 @@ def setup_flask_uploads(app):
 
 def setup_csrf_protection(app):
     from flask_wtf.csrf import CSRFProtect
-    return CSRFProtect(app)
+    csrf = CSRFProtect(app)
+
+    # Exempt the API from CSRF protection. The API is not vulnerable to
+    # cross-site request forgery, since it only allows authentication through
+    # the HTTP Authorization header, and will not accept any preexisting
+    # session.
+    from flasquelistan.views import api
+    csrf.exempt(api.mod)
+
+    return csrf
 
 
 def setup_cache_busting(app):

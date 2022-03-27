@@ -35,6 +35,8 @@ class User(flask_login.UserMixin, db.Model):
     body_mass = db.Column(db.Integer, nullable=True)
     y_chromosome = db.Column(db.Boolean, nullable=True)
     lang = db.Column(db.String(20), nullable=True, default="sv_SE")
+    # Hide account from the main member list. Useful for dedicated API accounts.
+    # hidden = db.Column(db.Boolean, nullable=False, default=False)
 
     # use_alter=True adds fk after ProfilePicture has been created to avoid
     # circular dependency
@@ -65,6 +67,25 @@ class User(flask_login.UserMixin, db.Model):
     # Do not change the following directly, use User.password
     _password_hash = db.Column(db.String(128))
     _password_timestamp = db.Column(db.DateTime)
+
+    @property
+    def api_dict(self):
+        data = {key: self.__dict__[key] for key in (
+            'id',
+            'email',
+            'first_name',
+            'last_name',
+            'nickname',
+            'birthday',
+            'balance',
+            'is_admin',
+            'active',
+            'lang',
+        )}
+        data['group'] = {'id': self.group_id, 'name': self.group.name} if self.group else None
+        data['phone'] = self.phone
+        data['full_name'] = self.full_name
+        return data
 
     def __init__(self, *args, **kwargs):
         if 'password' not in kwargs:
@@ -369,6 +390,12 @@ class Article(db.Model):
     def html_description(self):
         return markdown.markdown(self.description)
 
+    @property
+    def api_dict(self):
+        return {key: self.__dict__[key] for key in (
+            'id', 'weight', 'name', 'value', 'description', 'standardglas', 'is_active'
+        )}
+
     def __str__(self):
         return f"Article {self.name}"
 
@@ -420,6 +447,23 @@ class Transaction(db.Model):
         db.session.commit()
 
         return True
+
+    @property
+    def api_dict(self):
+        # raise ValueError(str((self.__dict__.items())))
+        data = {}
+        data['id'] = self.id
+        data['text'] = self.text
+        data['value'] = self.value
+        data['voided'] = self.voided
+        data['user_id'] = self.user_id
+        data['created_by_id'] = self.user_id
+        data['api_key_id'] = self.api_key_id
+        data['timestamp'] = self.timestamp
+        data['type'] = self.type
+        data['formatted_value'] = self.formatted_value
+        return data
+
 
     def __str__(self):
         return "f{self.__class__.__name__}: {self.value} @ {self.user}"
@@ -581,8 +625,10 @@ class Notification(db.Model):
     type = db.Column(db.String(50), nullable=True)
     reference = db.Column(db.String(50), nullable=True)
 
-    user = db.relationship('User', foreign_keys=user_id, backref='notifications')
-    timestamp = db.Column(db.DateTime, nullable=False, default=datetime.datetime.utcnow)
+    user = db.relationship('User', foreign_keys=user_id,
+                           backref='notifications')
+    timestamp = db.Column(db.DateTime, nullable=False,
+                          default=datetime.datetime.utcnow)
 
     def __str__(self):
         return "Notification \"{}...\" to user {}".format(self.text[:20], self.user_id)
